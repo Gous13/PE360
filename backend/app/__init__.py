@@ -54,6 +54,15 @@ def create_app():
         db.create_all()
         _seed_default_data()
 
+    # Health check route
+    @app.route('/health')
+    def health():
+        return {'status': 'ok', 'app': 'PE360'}, 200
+
+    @app.route('/')
+    def index():
+        return {'status': 'ok', 'app': 'PE360 API', 'version': '1.0.0'}, 200
+
     return app
 
 
