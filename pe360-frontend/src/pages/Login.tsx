@@ -151,17 +151,7 @@ export function Login() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 rounded-xl bg-white/5 lg:bg-slate-50 border border-white/10 lg:border-slate-100">
-            <p className="text-xs text-blue-200 lg:text-slate-500 font-medium mb-2">Demo credentials</p>
-            <div className="space-y-1">
-              <p className="text-xs text-blue-100 lg:text-slate-600">
-                <span className="font-medium">Admin:</span> admin@pe360.com / admin123
-              </p>
-              <p className="text-xs text-blue-100 lg:text-slate-600">
-                <span className="font-medium">PET:</span> teacher@pe360.com / teacher123
-              </p>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
