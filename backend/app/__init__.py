@@ -118,8 +118,10 @@ def _run_migrations():
         except Exception:
             return False
 
-    with engine.connect() as conn:
-        with conn.begin():
+    # Use engine.begin() — auto-commits on successful exit, rolls back on exception
+    # This is the correct SQLAlchemy 2.x pattern for DDL statements
+    try:
+        with engine.begin() as conn:
 
             # ── users: add school_name and phone ──────────────────────────
             if not col_exists('users', 'school_name'):
@@ -154,19 +156,17 @@ def _run_migrations():
             # ── students: unique constraint per user ──────────────────────
             if not idx_exists('students', 'uq_student_user_roll_class_section'):
                 if is_pg:
-                    # Drop old global constraint first (ignore if it doesn't exist)
                     _safe_alter(conn,
                         "ALTER TABLE students "
                         "DROP CONSTRAINT IF EXISTS uq_student_roll_class_section",
                         'drop old students constraint')
-                    # Add new per-user constraint
                     _safe_alter(conn,
                         "ALTER TABLE students "
                         "ADD CONSTRAINT uq_student_user_roll_class_section "
                         "UNIQUE (user_id, roll_no, class_name, section)",
                         'add new students constraint')
                 else:
-                    # SQLite cannot DROP CONSTRAINT — rebuild the table
+                    # SQLite: rebuild table to change constraint
                     try:
                         conn.execute(text("""
                             CREATE TABLE IF NOT EXISTS students_new (
@@ -190,12 +190,9 @@ def _run_migrations():
                             FROM students
                         """))
                         conn.execute(text("DROP TABLE students"))
-                        conn.execute(text(
-                            "ALTER TABLE students_new RENAME TO students"
-                        ))
+                        conn.execute(text("ALTER TABLE students_new RENAME TO students"))
                     except Exception as e:
-                        print(f'[PE360 migration] SQLite students rebuild skipped: {e}',
-                              file=sys.stderr)
+                        print(f'[PE360] SQLite students rebuild skipped: {e}', file=sys.stderr)
 
             # ── timetable_entries: add user_id ────────────────────────────
             if not col_exists('timetable_entries', 'user_id'):
@@ -205,8 +202,7 @@ def _run_migrations():
                     'add timetable_entries.user_id')
                 _safe_alter(conn,
                     f"UPDATE timetable_entries "
-                    f"SET user_id = COALESCE(created_by, {uid}) "
-                    f"WHERE user_id IS NULL",
+                    f"SET user_id = COALESCE(created_by, {uid}) WHERE user_id IS NULL",
                     'backfill timetable_entries.user_id')
 
             # ── attendance_sessions: add user_id ──────────────────────────
@@ -217,8 +213,7 @@ def _run_migrations():
                     'add attendance_sessions.user_id')
                 _safe_alter(conn,
                     f"UPDATE attendance_sessions "
-                    f"SET user_id = COALESCE(teacher_id, {uid}) "
-                    f"WHERE user_id IS NULL",
+                    f"SET user_id = COALESCE(teacher_id, {uid}) WHERE user_id IS NULL",
                     'backfill attendance_sessions.user_id')
 
             # ── important_items: add is_global ────────────────────────────
@@ -228,6 +223,9 @@ def _run_migrations():
                     f"ALTER TABLE important_items "
                     f"ADD COLUMN is_global BOOLEAN DEFAULT {default}",
                     'add important_items.is_global')
+
+    except Exception as e:
+        print(f'[PE360] Migration outer error: {e}', file=sys.stderr)
 
 
 def _seed_default_data():

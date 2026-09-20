@@ -24,7 +24,7 @@ export function Students() {
   const [showImport, setShowImport] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: 'student' | 'class'; id?: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'student' | 'class' | 'all'; id?: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { addToast } = useToastStore();
 
@@ -165,6 +165,20 @@ export function Students() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (deleteTarget?.type !== 'all') return;
+    try {
+      await studentsApi.deleteAll();
+      addToast('All student data deleted');
+      fetchStudents();
+      fetchClasses();
+    } catch {
+      addToast('Failed to delete all students', 'error');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
   function s2ab(s: string) {
     const buf = new ArrayBuffer(s.length);
     const view = new Uint8Array(buf);
@@ -196,6 +210,13 @@ export function Students() {
           <Button onClick={() => fileRef.current?.click()} icon={<Upload size={16} />} size="md">
             Import Excel
           </Button>
+          <button
+            onClick={() => setDeleteTarget({ type: 'all' })}
+            className="p-2.5 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+            title="Delete all my students"
+          >
+            <Trash2 size={18} />
+          </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
         </div>
       </div>
@@ -408,6 +429,16 @@ export function Students() {
         title="Clear Class"
         message={`Remove all students from Class ${selectedClass}-${selectedSection}? This cannot be undone.`}
         confirmLabel="Clear All"
+        danger
+      />
+
+      <ConfirmModal
+        isOpen={deleteTarget?.type === 'all'}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteAll}
+        title="Delete All Students"
+        message="This will permanently delete ALL your student data across every class and section. Attendance records will be preserved but will no longer show student names. This cannot be undone."
+        confirmLabel="Delete All Students"
         danger
       />
     </div>

@@ -62,6 +62,7 @@ export const studentsApi = {
   delete: (id: number) => api.delete(`/students/${id}`),
   deleteByClass: (cls: string, section: string) =>
     api.delete(`/students?class=${cls}&section=${section}`),
+  deleteAll: () => api.delete('/students'),
 };
 
 // Timetable

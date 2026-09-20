@@ -225,10 +225,17 @@ def delete_by_class():
     cls = request.args.get('class')
     section = request.args.get('section')
 
+    # Delete ALL students for this user if no class/section given
+    if not cls and not section:
+        count = Student.query.filter_by(user_id=user.id).count()
+        Student.query.filter_by(user_id=user.id).delete()
+        db.session.commit()
+        return jsonify({'message': f'All {count} students deleted'}), 200
+
     if not cls or not section:
         return jsonify({'error': 'class and section required'}), 400
 
-    # Scope deletion to the current user (admin can still only delete their own via this endpoint)
+    # Scope deletion to the current user
     Student.query.filter_by(user_id=user.id, class_name=cls, section=section).delete()
     db.session.commit()
     return jsonify({'message': f'Class {cls}-{section} cleared'}), 200
