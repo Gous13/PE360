@@ -17,14 +17,28 @@ def get_all():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    # Return: user's own items + global (admin-created) items
-    from sqlalchemy import or_
-    query = ImportantItem.query.filter(
-        or_(
-            ImportantItem.created_by == user.id,
-            ImportantItem.is_global == True  # noqa: E712
+    # Return: user's own items + explicitly global (admin-created) items.
+    # Items with created_by = NULL are treated as orphaned legacy data —
+    # only admins can see them to avoid cross-account leakage.
+    from sqlalchemy import or_, and_
+    if user.role == 'admin':
+        query = ImportantItem.query.filter(
+            or_(
+                ImportantItem.created_by == user.id,
+                ImportantItem.is_global == True,  # noqa: E712
+                ImportantItem.created_by == None   # noqa: E711 orphaned legacy
+            )
         )
-    )
+    else:
+        query = ImportantItem.query.filter(
+            or_(
+                ImportantItem.created_by == user.id,
+                and_(
+                    ImportantItem.is_global == True,   # noqa: E712
+                    ImportantItem.created_by != None   # noqa: E711 must have an owner
+                )
+            )
+        )
     items = query.order_by(
         ImportantItem.pinned.desc(),
         ImportantItem.created_at.desc()

@@ -227,7 +227,7 @@ def delete_by_class():
 
     from sqlalchemy import text
 
-    # Check whether user_id column exists yet in production
+    # Verify user_id column exists — NEVER fall back to unscoped deletion
     def _user_id_col_exists():
         try:
             engine = db.engine
@@ -245,17 +245,16 @@ def delete_by_class():
         except Exception:
             return False
 
-    has_user_id = _user_id_col_exists()
+    if not _user_id_col_exists():
+        # Schema not ready — refuse rather than deleting cross-account data
+        return jsonify({'error': 'Database schema error. Contact admin.'}), 503
 
     try:
         if not cls and not section:
-            # Delete ALL students for this user
-            if has_user_id:
-                result = db.session.execute(text(
-                    "DELETE FROM students WHERE user_id = :uid OR user_id IS NULL"
-                ), {'uid': user.id})
-            else:
-                result = db.session.execute(text("DELETE FROM students"))
+            # Delete ALL students for this user only
+            result = db.session.execute(text(
+                "DELETE FROM students WHERE user_id = :uid"
+            ), {'uid': user.id})
             db.session.commit()
             count = result.rowcount if result.rowcount != -1 else 0
             return jsonify({'message': f'All {count} students deleted'}), 200
@@ -263,16 +262,11 @@ def delete_by_class():
         if not cls or not section:
             return jsonify({'error': 'class and section required'}), 400
 
-        # Delete by class/section
-        if has_user_id:
-            db.session.execute(text(
-                "DELETE FROM students WHERE class_name = :cls AND section = :sec "
-                "AND (user_id = :uid OR user_id IS NULL)"
-            ), {'cls': cls, 'sec': section, 'uid': user.id})
-        else:
-            db.session.execute(text(
-                "DELETE FROM students WHERE class_name = :cls AND section = :sec"
-            ), {'cls': cls, 'sec': section})
+        # Delete by class/section — strictly scoped to this user
+        db.session.execute(text(
+            "DELETE FROM students WHERE class_name = :cls AND section = :sec "
+            "AND user_id = :uid"
+        ), {'cls': cls, 'sec': section, 'uid': user.id})
 
         db.session.commit()
         return jsonify({'message': f'Class {cls}-{section} cleared'}), 200

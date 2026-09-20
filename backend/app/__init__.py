@@ -144,6 +144,7 @@ def _run_migrations():
     add_column('attendance_sessions','user_id', 'INTEGER')
     add_column('important_items',    'is_global',
                'BOOLEAN DEFAULT FALSE' if is_pg else 'BOOLEAN DEFAULT 0')
+    add_column('important_items',    'created_by', 'INTEGER')
 
     # ── Back-fill user_id with first admin ───────────────────────────────────
     try:
@@ -168,6 +169,18 @@ def _run_migrations():
                 f"UPDATE attendance_sessions "
                 f"SET user_id = COALESCE(teacher_id, {uid}) WHERE user_id IS NULL",
                 'backfill attendance_sessions.user_id')
+            # Back-fill important_items.created_by: treat orphaned notes as
+            # admin-created global items so they remain visible but are owned.
+            if is_pg:
+                safe_exec(conn,
+                    f"UPDATE important_items "
+                    f"SET created_by = {uid}, is_global = TRUE WHERE created_by IS NULL",
+                    'backfill important_items.created_by')
+            else:
+                safe_exec(conn,
+                    f"UPDATE important_items "
+                    f"SET created_by = {uid}, is_global = 1 WHERE created_by IS NULL",
+                    'backfill important_items.created_by')
     except Exception as e:
         print(f'[PE360] backfill failed: {e}', file=sys.stderr)
 
