@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
 // API URL — points to Render backend
-const API_BASE = import.meta.env.VITE_API_URL || 'https://pe360-api.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://pe360.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
