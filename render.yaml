@@ -3,8 +3,8 @@ services:
     name: pe360-api
     runtime: python
     rootDir: backend
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --log-level debug
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     envVars:
       - key: SECRET_KEY
         generateValue: true
