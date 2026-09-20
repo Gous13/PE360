@@ -18,20 +18,15 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
         'DATABASE_URL',
         'sqlite:///pe360.db'
-    ).replace('postgres://', 'postgresql://')  # Fix for Railway/Heroku
+    ).replace('postgres://', 'postgresql://')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
     db.init_app(app)
     jwt.init_app(app)
 
-    CORS(app, resources={r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://localhost:4173",
-            os.getenv("FRONTEND_URL", "*"),
-        ]
-    }})
+    # Allow all origins — works for Vercel + local dev
+    CORS(app, origins="*", supports_credentials=False)
 
     # Register blueprints
     from .routes.auth import auth_bp
@@ -54,7 +49,6 @@ def create_app():
         db.create_all()
         _seed_default_data()
 
-    # Health check route
     @app.route('/health')
     def health():
         return {'status': 'ok', 'app': 'PE360'}, 200
