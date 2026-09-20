@@ -225,40 +225,61 @@ def delete_by_class():
     cls = request.args.get('class')
     section = request.args.get('section')
 
-    # Delete ALL students for this user if no class/section given
-    if not cls and not section:
+    from sqlalchemy import text
+
+    # Check whether user_id column exists yet in production
+    def _user_id_col_exists():
         try:
-            # Include rows where user_id IS NULL (pre-migration rows owned by first user)
-            from sqlalchemy import or_
-            query = Student.query.filter(
-                or_(Student.user_id == user.id, Student.user_id == None)  # noqa: E711
-            ) if user.role != 'admin' else Student.query.filter(
-                or_(Student.user_id == user.id, Student.user_id == None)  # noqa: E711
-            )
-            count = query.count()
-            query.delete(synchronize_session=False)
-            db.session.commit()
-            return jsonify({'message': f'All {count} students deleted'}), 200
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'error': f'Failed to delete students: {str(e)}'}), 500
+            engine = db.engine
+            is_pg = engine.dialect.name == 'postgresql'
+            with engine.connect() as c:
+                if is_pg:
+                    r = c.execute(text(
+                        "SELECT COUNT(*) FROM information_schema.columns "
+                        "WHERE table_name='students' AND column_name='user_id'"
+                    )).scalar()
+                    return r > 0
+                else:
+                    rows = c.execute(text("PRAGMA table_info(students)")).fetchall()
+                    return 'user_id' in [row[1] for row in rows]
+        except Exception:
+            return False
 
-    if not cls or not section:
-        return jsonify({'error': 'class and section required'}), 400
+    has_user_id = _user_id_col_exists()
 
-    # Scope deletion to the current user (include NULL user_id rows too)
     try:
-        from sqlalchemy import or_
-        Student.query.filter(
-            or_(Student.user_id == user.id, Student.user_id == None),  # noqa: E711
-            Student.class_name == cls,
-            Student.section == section
-        ).delete(synchronize_session=False)
+        if not cls and not section:
+            # Delete ALL students for this user
+            if has_user_id:
+                result = db.session.execute(text(
+                    "DELETE FROM students WHERE user_id = :uid OR user_id IS NULL"
+                ), {'uid': user.id})
+            else:
+                result = db.session.execute(text("DELETE FROM students"))
+            db.session.commit()
+            count = result.rowcount if result.rowcount != -1 else 0
+            return jsonify({'message': f'All {count} students deleted'}), 200
+
+        if not cls or not section:
+            return jsonify({'error': 'class and section required'}), 400
+
+        # Delete by class/section
+        if has_user_id:
+            db.session.execute(text(
+                "DELETE FROM students WHERE class_name = :cls AND section = :sec "
+                "AND (user_id = :uid OR user_id IS NULL)"
+            ), {'cls': cls, 'sec': section, 'uid': user.id})
+        else:
+            db.session.execute(text(
+                "DELETE FROM students WHERE class_name = :cls AND section = :sec"
+            ), {'cls': cls, 'sec': section})
+
         db.session.commit()
         return jsonify({'message': f'Class {cls}-{section} cleared'}), 200
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': f'Failed to clear class: {str(e)}'}), 500
+        return jsonify({'error': f'Delete failed: {str(e)}'}), 500
 
 
 # ── Admin: list users with their student counts ────────────────────────────
