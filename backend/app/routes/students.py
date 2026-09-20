@@ -227,18 +227,38 @@ def delete_by_class():
 
     # Delete ALL students for this user if no class/section given
     if not cls and not section:
-        count = Student.query.filter_by(user_id=user.id).count()
-        Student.query.filter_by(user_id=user.id).delete()
-        db.session.commit()
-        return jsonify({'message': f'All {count} students deleted'}), 200
+        try:
+            # Include rows where user_id IS NULL (pre-migration rows owned by first user)
+            from sqlalchemy import or_
+            query = Student.query.filter(
+                or_(Student.user_id == user.id, Student.user_id == None)  # noqa: E711
+            ) if user.role != 'admin' else Student.query.filter(
+                or_(Student.user_id == user.id, Student.user_id == None)  # noqa: E711
+            )
+            count = query.count()
+            query.delete(synchronize_session=False)
+            db.session.commit()
+            return jsonify({'message': f'All {count} students deleted'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to delete students: {str(e)}'}), 500
 
     if not cls or not section:
         return jsonify({'error': 'class and section required'}), 400
 
-    # Scope deletion to the current user
-    Student.query.filter_by(user_id=user.id, class_name=cls, section=section).delete()
-    db.session.commit()
-    return jsonify({'message': f'Class {cls}-{section} cleared'}), 200
+    # Scope deletion to the current user (include NULL user_id rows too)
+    try:
+        from sqlalchemy import or_
+        Student.query.filter(
+            or_(Student.user_id == user.id, Student.user_id == None),  # noqa: E711
+            Student.class_name == cls,
+            Student.section == section
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({'message': f'Class {cls}-{section} cleared'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to clear class: {str(e)}'}), 500
 
 
 # ── Admin: list users with their student counts ────────────────────────────

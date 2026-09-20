@@ -106,7 +106,9 @@ def _run_migrations():
 
     def col_exists(table, col):
         try:
+            # Force fresh inspection — don't use cached metadata
             insp = sa_inspect(engine)
+            insp.clear_cache()
             return col in [c['name'] for c in insp.get_columns(table)]
         except Exception:
             return False
@@ -114,6 +116,7 @@ def _run_migrations():
     def idx_exists(table, idx):
         try:
             insp = sa_inspect(engine)
+            insp.clear_cache()
             return idx in [i['name'] for i in insp.get_indexes(table)]
         except Exception:
             return False
