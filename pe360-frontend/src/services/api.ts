@@ -44,6 +44,8 @@ export const usersApi = {
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
   toggleStatus: (id: number) => api.patch(`/users/${id}/toggle-status`),
+  updateProfile: (data: any) => api.put('/users/profile', data),
+  getSummary: () => api.get('/students/admin/summary'),
 };
 
 // Students

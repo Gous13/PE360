@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash
-from ..models import User, AuditLog
+from ..models import User, AuditLog, Student, TimetableEntry, AttendanceSession, AttendanceRecord, ImportantItem
 from .. import db
 
 users_bp = Blueprint('users', __name__)
@@ -39,6 +39,8 @@ def create_user():
     password = data.get('password', '')
     role = data.get('role', 'user')
     status = data.get('status', 'active')
+    school_name = data.get('schoolName', '').strip()
+    phone = data.get('phone', '').strip()
 
     if not name or not email or not password:
         return jsonify({'error': 'Name, email, and password are required'}), 400
@@ -55,6 +57,8 @@ def create_user():
         password_hash=generate_password_hash(password),
         role=role,
         status=status,
+        school_name=school_name,
+        phone=phone,
     )
     db.session.add(new_user)
 
@@ -87,6 +91,10 @@ def update_user(user_id):
         user.role = data['role']
     if 'status' in data:
         user.status = data['status']
+    if 'schoolName' in data:
+        user.school_name = data['schoolName'].strip()
+    if 'phone' in data:
+        user.phone = data['phone'].strip()
     if 'password' in data and data['password']:
         if len(data['password']) < 6:
             return jsonify({'error': 'Password must be at least 6 characters'}), 400
@@ -112,6 +120,23 @@ def delete_user(user_id):
 
     user = User.query.get_or_404(user_id)
 
+    # Safe cascade: delete user's private data but preserve global/shared data
+    # 1. Delete attendance records for this user's sessions
+    sessions = AttendanceSession.query.filter_by(user_id=user_id).all()
+    for s in sessions:
+        AttendanceRecord.query.filter_by(session_id=s.id).delete()
+    AttendanceSession.query.filter_by(user_id=user_id).delete()
+
+    # 2. Delete user's students
+    Student.query.filter_by(user_id=user_id).delete()
+
+    # 3. Delete user's timetable entries
+    TimetableEntry.query.filter_by(user_id=user_id).delete()
+
+    # 4. Delete user's private important items (NOT global ones — those stay for all users)
+    ImportantItem.query.filter_by(created_by=user_id, is_global=False).delete()
+
+    # 5. Now delete the user
     log = AuditLog(user_id=current_user.id, user_name=current_user.name,
                    action='DELETE_USER', details=f'Deleted user: {user.name} ({user.email})')
     db.session.add(log)
@@ -119,7 +144,7 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
 
-    return jsonify({'message': 'User deleted successfully'}), 200
+    return jsonify({'message': 'User and their school data deleted successfully'}), 200
 
 
 @users_bp.route('/<int:user_id>/toggle-status', methods=['PATCH'])
@@ -140,4 +165,26 @@ def toggle_status(user_id):
     db.session.add(log)
     db.session.commit()
 
+    return jsonify({'user': user.to_dict()}), 200
+
+
+# ── Profile update (any authenticated user can update their own school info) ──
+@users_bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+
+    if 'schoolName' in data:
+        user.school_name = data['schoolName'].strip()
+    if 'phone' in data:
+        user.phone = data['phone'].strip()
+    if 'name' in data and data['name'].strip():
+        user.name = data['name'].strip()
+
+    db.session.commit()
     return jsonify({'user': user.to_dict()}), 200

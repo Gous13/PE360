@@ -9,24 +9,42 @@ import io
 students_bp = Blueprint('students', __name__)
 
 
+def _get_user(user_id):
+    return User.query.get(int(user_id))
+
+
+def _base_query(user):
+    """Return a student query scoped to the authenticated user.
+    Admin can pass ?all=1 to see all students (for admin view-data support).
+    """
+    q = Student.query
+    if user.role == 'admin' and request.args.get('all') == '1':
+        return q  # admin sees everything when explicitly requested
+    if user.role == 'admin' and request.args.get('user_id'):
+        # admin viewing a specific user's data
+        target_uid = int(request.args.get('user_id'))
+        return q.filter_by(user_id=target_uid)
+    return q.filter_by(user_id=user.id)
+
+
 @students_bp.route('', methods=['GET'])
 @jwt_required()
 def get_students():
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     cls = request.args.get('class', '')
     section = request.args.get('section', '')
 
-    query = Student.query
+    query = _base_query(user)
     if cls:
         query = query.filter_by(class_name=cls)
     if section:
         query = query.filter_by(section=section)
 
-    students = query.order_by(
-        Student.class_name, Student.section,
-        Student.roll_no.cast(db.Integer) if False else Student.roll_no
-    ).all()
+    students = query.all()
 
-    # Try numeric sort
     try:
         students = sorted(students, key=lambda s: int(s.roll_no))
     except (ValueError, TypeError):
@@ -39,11 +57,23 @@ def get_students():
 @jwt_required()
 def get_classes():
     from sqlalchemy import func
-    results = db.session.query(
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    query = db.session.query(
         Student.class_name,
         func.count(Student.id).label('count')
-    ).group_by(Student.class_name).all()
+    )
 
+    if user.role == 'admin' and request.args.get('all') == '1':
+        pass  # no filter
+    elif user.role == 'admin' and request.args.get('user_id'):
+        query = query.filter(Student.user_id == int(request.args.get('user_id')))
+    else:
+        query = query.filter(Student.user_id == user.id)
+
+    results = query.group_by(Student.class_name).all()
     classes = [{'class': r.class_name, 'count': r.count} for r in results]
     total = sum(c['count'] for c in classes)
     return jsonify({'classes': classes, 'total': total}), 200
@@ -52,8 +82,9 @@ def get_classes():
 @students_bp.route('/import', methods=['POST'])
 @jwt_required()
 def import_students():
-    user_id = get_jwt_identity()
-    user = User.query.get(int(user_id))
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -104,9 +135,9 @@ def import_students():
             if gender not in ['male', 'female', 'other']:
                 gender = 'male'
 
-            # Check duplicate
+            # Duplicate check: scoped to this user
             existing = Student.query.filter_by(
-                roll_no=roll_no, class_name=cls, section=section
+                user_id=user.id, roll_no=roll_no, class_name=cls, section=section
             ).first()
 
             if existing:
@@ -114,6 +145,7 @@ def import_students():
                 existing.gender = gender
             else:
                 student = Student(
+                    user_id=user.id,
                     roll_no=roll_no, name=name,
                     class_name=cls, section=section, gender=gender
                 )
@@ -168,7 +200,16 @@ def download_template():
 @students_bp.route('/<int:student_id>', methods=['DELETE'])
 @jwt_required()
 def delete_student(student_id):
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     student = Student.query.get_or_404(student_id)
+
+    # Ownership check — admin can delete any student
+    if user.role != 'admin' and student.user_id != user.id:
+        return jsonify({'error': 'Forbidden: this student does not belong to your account'}), 403
+
     db.session.delete(student)
     db.session.commit()
     return jsonify({'message': 'Student removed'}), 200
@@ -177,12 +218,49 @@ def delete_student(student_id):
 @students_bp.route('', methods=['DELETE'])
 @jwt_required()
 def delete_by_class():
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     cls = request.args.get('class')
     section = request.args.get('section')
 
     if not cls or not section:
         return jsonify({'error': 'class and section required'}), 400
 
-    Student.query.filter_by(class_name=cls, section=section).delete()
+    # Scope deletion to the current user (admin can still only delete their own via this endpoint)
+    Student.query.filter_by(user_id=user.id, class_name=cls, section=section).delete()
     db.session.commit()
     return jsonify({'message': f'Class {cls}-{section} cleared'}), 200
+
+
+# ── Admin: list users with their student counts ────────────────────────────
+@students_bp.route('/admin/summary', methods=['GET'])
+@jwt_required()
+def admin_summary():
+    user = _get_user(get_jwt_identity())
+    if not user or user.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    from sqlalchemy import func
+    results = db.session.query(
+        Student.user_id,
+        func.count(Student.id).label('count')
+    ).group_by(Student.user_id).all()
+
+    summary = {r.user_id: r.count for r in results}
+    users = User.query.order_by(User.created_at).all()
+
+    data = []
+    for u in users:
+        data.append({
+            'userId': u.id,
+            'userName': u.name,
+            'email': u.email,
+            'schoolName': u.school_name or '',
+            'role': u.role,
+            'status': u.status,
+            'studentCount': summary.get(u.id, 0),
+        })
+
+    return jsonify({'summary': data}), 200

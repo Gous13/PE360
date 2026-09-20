@@ -8,12 +8,25 @@ import io
 attendance_bp = Blueprint('attendance', __name__)
 
 
+def _get_user(user_id):
+    return User.query.get(int(user_id))
+
+
+def _session_query(user):
+    q = AttendanceSession.query
+    if user.role == 'admin' and request.args.get('user_id'):
+        return q.filter_by(user_id=int(request.args.get('user_id')))
+    return q.filter_by(user_id=user.id)
+
+
 @attendance_bp.route('/sessions', methods=['POST'])
 @jwt_required()
 def save_session():
-    user_id = get_jwt_identity()
-    data = request.get_json()
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
+    data = request.get_json()
     date = data.get('date')
     class_name = data.get('class')
     section = data.get('section')
@@ -24,17 +37,19 @@ def save_session():
     if not date or not class_name or not section:
         return jsonify({'error': 'date, class, and section are required'}), 400
 
-    # Find or create session
+    # Find or create session — scoped to this user
     session = AttendanceSession.query.filter_by(
-        date=date, class_name=class_name, section=section, period=period
+        user_id=user.id, date=date, class_name=class_name,
+        section=section, period=period
     ).first()
 
     if session:
         AttendanceRecord.query.filter_by(session_id=session.id).delete()
     else:
         session = AttendanceSession(
+            user_id=user.id,
             date=date, class_name=class_name, section=section,
-            period=period, subject=subject, teacher_id=int(user_id)
+            period=period, subject=subject, teacher_id=user.id
         )
         db.session.add(session)
         db.session.flush()
@@ -43,17 +58,19 @@ def save_session():
         student_id = rec.get('studentId')
         status = rec.get('status', 'present')
         if student_id:
-            record = AttendanceRecord(
-                session_id=session.id,
-                student_id=student_id,
-                status=status
-            )
-            db.session.add(record)
+            # Verify student belongs to this user
+            student = Student.query.filter_by(id=student_id, user_id=user.id).first()
+            if student:
+                record = AttendanceRecord(
+                    session_id=session.id,
+                    student_id=student_id,
+                    status=status
+                )
+                db.session.add(record)
 
-    user = User.query.get(int(user_id))
     present_count = sum(1 for r in records if r.get('status') == 'present')
     log = AuditLog(
-        user_id=int(user_id), user_name=user.name if user else 'Unknown',
+        user_id=user.id, user_name=user.name,
         action='SAVE_ATTENDANCE',
         details=f'Marked attendance for {class_name}-{section} on {date}: {present_count}/{len(records)} present'
     )
@@ -66,11 +83,15 @@ def save_session():
 @attendance_bp.route('/sessions', methods=['GET'])
 @jwt_required()
 def get_sessions():
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     cls = request.args.get('class')
     section = request.args.get('section')
     date = request.args.get('date')
 
-    query = AttendanceSession.query
+    query = _session_query(user)
     if cls: query = query.filter_by(class_name=cls)
     if section: query = query.filter_by(section=section)
     if date: query = query.filter_by(date=date)
@@ -82,13 +103,25 @@ def get_sessions():
 @attendance_bp.route('/sessions/<int:session_id>', methods=['GET'])
 @jwt_required()
 def get_session(session_id):
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     session = AttendanceSession.query.get_or_404(session_id)
+
+    if user.role != 'admin' and session.user_id != user.id:
+        return jsonify({'error': 'Forbidden'}), 403
+
     return jsonify({'session': session.to_dict(include_records=True)}), 200
 
 
 @attendance_bp.route('/monthly', methods=['GET'])
 @jwt_required()
 def get_monthly():
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     cls = request.args.get('class')
     section = request.args.get('section')
     month = request.args.get('month')  # YYYY-MM
@@ -96,15 +129,22 @@ def get_monthly():
     if not cls or not section or not month:
         return jsonify({'error': 'class, section, and month are required'}), 400
 
+    # Determine which user's data to query
+    target_uid = user.id
+    if user.role == 'admin' and request.args.get('user_id'):
+        target_uid = int(request.args.get('user_id'))
+
     sessions = AttendanceSession.query.filter(
+        AttendanceSession.user_id == target_uid,
         AttendanceSession.class_name == cls,
         AttendanceSession.section == section,
         AttendanceSession.date.like(f'{month}%')
     ).all()
 
-    students = Student.query.filter_by(class_name=cls, section=section).all()
+    students = Student.query.filter_by(
+        user_id=target_uid, class_name=cls, section=section
+    ).all()
 
-    # Calculate per-student stats
     student_stats = []
     for student in students:
         present = 0
@@ -134,7 +174,6 @@ def get_monthly():
     except (ValueError, TypeError):
         student_stats = sorted(student_stats, key=lambda s: s['rollNo'])
 
-    total_students = len(students)
     avg_attendance = 0
     if student_stats:
         avg_attendance = round(sum(s['percentage'] for s in student_stats) / len(student_stats), 1)
@@ -144,7 +183,7 @@ def get_monthly():
         'section': section,
         'month': month,
         'totalSessions': len(sessions),
-        'totalStudents': total_students,
+        'totalStudents': len(students),
         'avgAttendance': avg_attendance,
         'students': student_stats
     }), 200
@@ -153,6 +192,10 @@ def get_monthly():
 @attendance_bp.route('/pdf', methods=['GET'])
 @jwt_required()
 def generate_pdf():
+    user = _get_user(get_jwt_identity())
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     cls = request.args.get('class')
     section = request.args.get('section')
     month = request.args.get('month')
@@ -160,13 +203,25 @@ def generate_pdf():
     if not cls or not section or not month:
         return jsonify({'error': 'class, section, and month are required'}), 400
 
+    # Determine which user's data to query
+    target_uid = user.id
+    if user.role == 'admin' and request.args.get('user_id'):
+        target_uid = int(request.args.get('user_id'))
+
+    owner = User.query.get(target_uid)
+    school_name = (owner.school_name or '').strip() if owner else ''
+    pet_name = owner.name if owner else ''
+
     sessions = AttendanceSession.query.filter(
+        AttendanceSession.user_id == target_uid,
         AttendanceSession.class_name == cls,
         AttendanceSession.section == section,
         AttendanceSession.date.like(f'{month}%')
     ).order_by(AttendanceSession.date).all()
 
-    students = Student.query.filter_by(class_name=cls, section=section).all()
+    students = Student.query.filter_by(
+        user_id=target_uid, class_name=cls, section=section
+    ).all()
     try:
         students = sorted(students, key=lambda s: int(s.roll_no))
     except (ValueError, TypeError):
@@ -186,20 +241,25 @@ def generate_pdf():
         styles = getSampleStyleSheet()
         story = []
 
-        # Title
         title_style = ParagraphStyle('title', parent=styles['Heading1'], alignment=1, fontSize=16, spaceAfter=4)
+        sub_style = ParagraphStyle('sub', parent=styles['Normal'], alignment=1, fontSize=11, spaceAfter=4)
+        sub2_style = ParagraphStyle('sub2', parent=styles['Normal'], alignment=1, fontSize=10, spaceAfter=12)
+
+        # School name in title if available
+        if school_name:
+            story.append(Paragraph(school_name, title_style))
         story.append(Paragraph("PE360 — Physical Education Attendance Report", title_style))
 
-        sub_style = ParagraphStyle('sub', parent=styles['Normal'], alignment=1, fontSize=11, spaceAfter=12)
         year, mon = month.split('-')
         month_names = ['','January','February','March','April','May','June','July','August','September','October','November','December']
         month_name = month_names[int(mon)]
         story.append(Paragraph(f"Class: {cls}-{section} | Month: {month_name} {year}", sub_style))
+        if pet_name:
+            story.append(Paragraph(f"PET: {pet_name}", sub2_style))
 
         if not sessions:
             story.append(Paragraph("No attendance sessions found for this period.", styles['Normal']))
         else:
-            # Build table
             dates = [s.date.split('-')[2] for s in sessions]
             header = ['Roll', 'Student Name'] + dates + ['Present', 'Absent', '%']
             data = [header]
@@ -242,7 +302,6 @@ def generate_pdf():
                 ('PADDING', (0, 0), (-1, -1), 3),
             ]))
 
-            # Color A/P cells
             for row_i, student in enumerate(students, start=1):
                 for col_i, session in enumerate(sessions, start=2):
                     record = next((r for r in session.records if r.student_id == student.id), None)

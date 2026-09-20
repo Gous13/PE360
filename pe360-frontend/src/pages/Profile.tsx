@@ -1,20 +1,26 @@
 import { useState } from 'react';
-import { UserCircle, Lock, LogOut, Shield, User } from 'lucide-react';
+import { UserCircle, Lock, LogOut, Shield, User, Building2, Phone, Edit2, Check, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
-import { authApi } from '../services/api';
+import { authApi, usersApi } from '../services/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 
 export function Profile() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser } = useAuthStore();
   const { addToast } = useToastStore();
   const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [pwForm, setPwForm] = useState({ old: '', new: '', confirm: '' });
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    schoolName: user?.schoolName || '',
+    phone: user?.phone || '',
+  });
   const [saving, setSaving] = useState(false);
 
   const handleLogout = () => {
@@ -45,6 +51,36 @@ export function Profile() {
     }
   };
 
+  const openProfileModal = () => {
+    setProfileForm({
+      name: user?.name || '',
+      schoolName: user?.schoolName || '',
+      phone: user?.phone || '',
+    });
+    setShowProfileModal(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profileForm.name.trim()) {
+      addToast('Name is required', 'warning'); return;
+    }
+    setSaving(true);
+    try {
+      const r = await usersApi.updateProfile({
+        name: profileForm.name,
+        schoolName: profileForm.schoolName,
+        phone: profileForm.phone,
+      });
+      updateUser(r.data.user);
+      addToast('Profile updated successfully');
+      setShowProfileModal(false);
+    } catch (err: any) {
+      addToast(err.response?.data?.error || 'Failed to update profile', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="px-4 py-5 max-w-md mx-auto lg:px-8 lg:py-6">
       <h1 className="text-2xl font-bold text-slate-900 mb-6">Profile</h1>
@@ -58,20 +94,35 @@ export function Profile() {
         </div>
         <h2 className="text-xl font-bold text-slate-900">{user?.name}</h2>
         <p className="text-slate-500 text-sm mt-0.5">{user?.email}</p>
+        {user?.schoolName && (
+          <p className="text-slate-400 text-xs mt-1 flex items-center gap-1">
+            <Building2 size={11} /> {user.schoolName}
+          </p>
+        )}
         <div className="mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50">
           {user?.role === 'admin' ? <Shield size={13} className="text-blue-600" /> : <User size={13} className="text-blue-600" />}
-          <span className="text-xs font-semibold text-blue-700 capitalize">{user?.role}</span>
+          <span className="text-xs font-semibold text-blue-700 capitalize">{user?.role === 'admin' ? 'Admin' : 'PET'}</span>
         </div>
       </div>
 
       {/* Info card */}
       <Card className="mb-4">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Account Information</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account Information</h3>
+          <button
+            onClick={openProfileModal}
+            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            <Edit2 size={12} /> Edit
+          </button>
+        </div>
         <div className="space-y-3">
           {[
             { label: 'Full Name', value: user?.name || '—', icon: UserCircle },
             { label: 'Email', value: user?.email || '—', icon: UserCircle },
-            { label: 'Role', value: user?.role || '—', icon: Shield, capitalize: true },
+            { label: 'School', value: user?.schoolName || 'Not set', icon: Building2 },
+            { label: 'Phone', value: user?.phone || 'Not set', icon: Phone },
+            { label: 'Role', value: user?.role === 'admin' ? 'Admin' : 'PE Teacher', icon: Shield },
             { label: 'Status', value: user?.status || 'active', icon: UserCircle, capitalize: true },
           ].map(({ label, value, icon: Icon, capitalize }) => (
             <div key={label} className="flex items-center gap-3">
@@ -121,6 +172,41 @@ export function Profile() {
         <p className="text-xs text-slate-300 mt-0.5">Version 1.0.0</p>
       </div>
 
+      {/* Edit Profile Modal */}
+      <Modal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        title="Edit Profile"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setShowProfileModal(false)} fullWidth>Cancel</Button>
+            <Button onClick={handleSaveProfile} loading={saving} fullWidth>Save Changes</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Full Name"
+            value={profileForm.name}
+            onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+            placeholder="Your full name"
+          />
+          <Input
+            label="School Name"
+            value={profileForm.schoolName}
+            onChange={(e) => setProfileForm({ ...profileForm, schoolName: e.target.value })}
+            placeholder="e.g. ABC High School"
+          />
+          <Input
+            label="Phone Number"
+            value={profileForm.phone}
+            onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+            placeholder="e.g. +91 98765 43210"
+          />
+        </div>
+      </Modal>
+
+      {/* Change Password Modal */}
       <Modal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}

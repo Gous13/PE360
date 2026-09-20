@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pin, PinOff, Edit2, Trash2, Search } from 'lucide-react';
+import { Plus, Pin, PinOff, Edit2, Trash2, Search, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { importantApi } from '../services/api';
 import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store/authStore';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input, Textarea, Select } from '../components/ui/Input';
@@ -33,10 +34,13 @@ export function Important() {
   const [editItem, setEditItem] = useState<ImportantItem | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const { addToast } = useToastStore();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
 
   const [form, setForm] = useState({
     title: '', description: '', category: 'General',
     date: format(new Date(), 'yyyy-MM-dd'), priority: 'medium', pinned: false,
+    isGlobal: false,
   });
 
   useEffect(() => { fetchItems(); }, []);
@@ -55,13 +59,13 @@ export function Important() {
 
   const openCreate = () => {
     setEditItem(null);
-    setForm({ title: '', description: '', category: 'General', date: format(new Date(), 'yyyy-MM-dd'), priority: 'medium', pinned: false });
+    setForm({ title: '', description: '', category: 'General', date: format(new Date(), 'yyyy-MM-dd'), priority: 'medium', pinned: false, isGlobal: false });
     setShowModal(true);
   };
 
   const openEdit = (item: ImportantItem) => {
     setEditItem(item);
-    setForm({ title: item.title, description: item.description, category: item.category, date: item.date.split('T')[0], priority: item.priority, pinned: item.pinned });
+    setForm({ title: item.title, description: item.description, category: item.category, date: item.date.split('T')[0], priority: item.priority, pinned: item.pinned, isGlobal: item.isGlobal });
     setShowModal(true);
   };
 
@@ -231,6 +235,22 @@ export function Important() {
             </div>
             <span className="text-sm text-slate-700">Pin this item to top</span>
           </label>
+          {isAdmin && (
+            <label className="flex items-center gap-3 cursor-pointer py-1">
+              <div
+                onClick={() => setForm({ ...form, isGlobal: !form.isGlobal })}
+                className={cn(
+                  'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
+                  form.isGlobal ? 'bg-green-600 border-green-600' : 'border-slate-300'
+                )}
+              >
+                {form.isGlobal && <svg viewBox="0 0 10 8" className="w-3 h-3 text-white fill-current"><path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" /></svg>}
+              </div>
+              <span className="text-sm text-slate-700 flex items-center gap-1">
+                <Globe size={13} className="text-green-600" /> Visible to all PET users (Global)
+              </span>
+            </label>
+          )}
         </div>
       </Modal>
 
@@ -260,7 +280,14 @@ function ItemCard({ item, onEdit, onDelete, onPin }: {
         <div className={cn('w-2 h-2 rounded-full mt-2 flex-shrink-0', pConfig.dot)} />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-slate-800 text-sm leading-snug flex-1">{item.title}</h3>
+            <h3 className="font-semibold text-slate-800 text-sm leading-snug flex-1">
+              {item.title}
+              {item.isGlobal && (
+                <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                  <Globe size={9} /> Global
+                </span>
+              )}
+            </h3>
             <div className="flex items-center gap-1 flex-shrink-0">
               <button onClick={() => onPin(item.id)} className={cn('p-1.5 rounded-lg transition-colors', item.pinned ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-amber-50')}>
                 {item.pinned ? <Pin size={13} /> : <PinOff size={13} />}

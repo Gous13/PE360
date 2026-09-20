@@ -4,6 +4,8 @@ export interface User {
   email: string;
   role: 'admin' | 'user';
   status: 'active' | 'inactive';
+  schoolName: string;
+  phone: string;
   createdAt: string;
 }
 
@@ -110,6 +112,7 @@ export interface ImportantItem {
   priority: 'high' | 'medium' | 'low';
   pinned: boolean;
   createdBy: number;
+  isGlobal: boolean;
 }
 
 export interface AuditLog {

@@ -10,6 +10,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), default='user')  # admin, user
     status = db.Column(db.String(20), default='active')  # active, inactive
+    school_name = db.Column(db.String(200), default='')
+    phone = db.Column(db.String(30), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -19,6 +21,8 @@ class User(db.Model):
             'email': self.email,
             'role': self.role,
             'status': self.status,
+            'schoolName': self.school_name or '',
+            'phone': self.phone or '',
             'createdAt': self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -26,6 +30,7 @@ class User(db.Model):
 class Student(db.Model):
     __tablename__ = 'students'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     roll_no = db.Column(db.String(20), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     class_name = db.Column(db.String(10), nullable=False)
@@ -33,8 +38,10 @@ class Student(db.Model):
     gender = db.Column(db.String(10), default='male')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Unique per user: same roll+class+section can exist for different PETs
     __table_args__ = (
-        db.UniqueConstraint('roll_no', 'class_name', 'section', name='uq_student_roll_class_section'),
+        db.UniqueConstraint('user_id', 'roll_no', 'class_name', 'section',
+                            name='uq_student_user_roll_class_section'),
     )
 
     def to_dict(self):
@@ -51,6 +58,7 @@ class Student(db.Model):
 class TimetableEntry(db.Model):
     __tablename__ = 'timetable_entries'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     day = db.Column(db.String(20), nullable=False)
     period = db.Column(db.Integer, nullable=False)
     class_name = db.Column(db.String(10), nullable=False)
@@ -76,6 +84,7 @@ class TimetableEntry(db.Model):
 class AttendanceSession(db.Model):
     __tablename__ = 'attendance_sessions'
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     date = db.Column(db.String(20), nullable=False)
     class_name = db.Column(db.String(10), nullable=False)
     section = db.Column(db.String(5), nullable=False)
@@ -122,6 +131,8 @@ class AttendanceRecord(db.Model):
 class ImportantItem(db.Model):
     __tablename__ = 'important_items'
     id = db.Column(db.Integer, primary_key=True)
+    # is_global=True means admin created it for all users; False means private to owner
+    is_global = db.Column(db.Boolean, default=False)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, default='')
     category = db.Column(db.String(50), default='General')
@@ -141,6 +152,7 @@ class ImportantItem(db.Model):
             'priority': self.priority,
             'pinned': self.pinned,
             'createdBy': self.created_by,
+            'isGlobal': self.is_global or False,
         }
 
 
