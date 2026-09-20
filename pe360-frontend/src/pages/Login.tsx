@@ -10,6 +10,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retrying, setRetrying] = useState(false);
   const { setAuth } = useAuthStore();
   const navigate = useNavigate();
 
@@ -23,23 +24,42 @@ export function Login() {
     }
 
     setLoading(true);
+    setRetrying(false);
     try {
       const res = await authApi.login(email.trim(), password);
       setAuth(res.data.user, res.data.token);
       navigate('/', { replace: true });
     } catch (err: any) {
       if (!err.response) {
-        // Network error — backend not reachable
-        setError('Cannot connect to the server. If using Render free plan, the server may be starting up (takes ~30 seconds). Please wait and try again.');
+        setRetrying(true);
+        setError('Server is starting up (Render free plan). Retrying in 15 seconds...');
+        // Auto-retry once after 15 seconds for cold start
+        setTimeout(async () => {
+          try {
+            const res = await authApi.login(email.trim(), password);
+            setAuth(res.data.user, res.data.token);
+            navigate('/', { replace: true });
+          } catch (err2: any) {
+            setRetrying(false);
+            if (!err2.response) {
+              setError('Cannot connect to the server. Please check your internet connection and try again.');
+            } else if (err2.response?.status === 401) {
+              setError('Invalid email or password.');
+            } else {
+              setError(err2.response?.data?.error || 'Something went wrong. Please try again.');
+            }
+          }
+        }, 15000);
+        return;
       } else if (err.response.status === 401) {
         setError('Invalid email or password. Please check and try again.');
       } else if (err.response.status === 403) {
-        setError(err.response.data?.error || 'Your account has been deactivated. Contact admin.');
+        setError(err.response.data?.error || 'Your account has been deactivated.');
       } else {
         setError(err.response?.data?.error || 'Something went wrong. Please try again.');
       }
     } finally {
-      setLoading(false);
+      if (!retrying) setLoading(false);
     }
   };
 

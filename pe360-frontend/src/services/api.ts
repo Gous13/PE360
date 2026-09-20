@@ -1,11 +1,13 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+// API URL — points to Render backend
 const API_BASE = import.meta.env.VITE_API_URL || 'https://pe360-api.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 60000, // 60s timeout for Render free tier cold start
 });
 
 api.interceptors.request.use((config) => {
