@@ -210,13 +210,6 @@ export function Students() {
           <Button onClick={() => fileRef.current?.click()} icon={<Upload size={16} />} size="md">
             Import Excel
           </Button>
-          <button
-            onClick={() => setDeleteTarget({ type: 'all' })}
-            className="p-2.5 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-            title="Delete all my students"
-          >
-            <Trash2 size={18} />
-          </button>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChange} />
         </div>
       </div>

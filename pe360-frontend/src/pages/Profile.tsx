@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserCircle, Lock, LogOut, Shield, User, Building2, Phone, Edit2, Check, X } from 'lucide-react';
+import { UserCircle, Lock, LogOut, Shield, User, Building2, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -107,14 +107,8 @@ export function Profile() {
 
       {/* Info card */}
       <Card className="mb-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Account Information</h3>
-          <button
-            onClick={openProfileModal}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium"
-          >
-            <Edit2 size={12} /> Edit
-          </button>
         </div>
         <div className="space-y-3">
           {[
