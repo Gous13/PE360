@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
@@ -16,17 +16,33 @@ def create_app():
     app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'pe360-jwt-secret-change-in-production')
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-        'DATABASE_URL',
-        'sqlite:///pe360.db'
+        'DATABASE_URL', 'sqlite:///pe360.db'
     ).replace('postgres://', 'postgresql://')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
     db.init_app(app)
     jwt.init_app(app)
 
-    # Allow all origins — works for Vercel + local dev
-    CORS(app, origins="*", supports_credentials=False)
+    # Handle CORS manually — most reliable approach
+    @app.after_request
+    def add_cors_headers(response):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+        return response
+
+    # Handle preflight OPTIONS requests for ALL routes
+    @app.before_request
+    def handle_preflight():
+        from flask import request, Response
+        if request.method == 'OPTIONS':
+            res = Response()
+            res.headers['Access-Control-Allow-Origin'] = '*'
+            res.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+            res.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+            res.status_code = 200
+            return res
 
     # Register blueprints
     from .routes.auth import auth_bp
@@ -51,18 +67,18 @@ def create_app():
 
     @app.route('/health')
     def health():
-        return {'status': 'ok', 'app': 'PE360'}, 200
+        return jsonify({'status': 'ok', 'app': 'PE360'}), 200
 
     @app.route('/')
     def index():
-        routes = [str(r) for r in app.url_map.iter_rules()]
-        return {
+        rules = [str(r) for r in app.url_map.iter_rules()]
+        return jsonify({
             'status': 'ok',
             'app': 'PE360 API',
             'version': '1.0.0',
-            'total_routes': len(routes),
-            'has_login': '/api/auth/login' in routes
-        }, 200
+            'total_routes': len(rules),
+            'has_login': '/api/auth/login' in rules
+        }), 200
 
     return app
 
