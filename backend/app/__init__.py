@@ -55,7 +55,14 @@ def create_app():
 
     @app.route('/')
     def index():
-        return {'status': 'ok', 'app': 'PE360 API', 'version': '1.0.0'}, 200
+        routes = [str(r) for r in app.url_map.iter_rules()]
+        return {
+            'status': 'ok',
+            'app': 'PE360 API',
+            'version': '1.0.0',
+            'total_routes': len(routes),
+            'has_login': '/api/auth/login' in routes
+        }, 200
 
     return app
 
