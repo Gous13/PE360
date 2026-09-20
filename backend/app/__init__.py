@@ -49,6 +49,7 @@ def create_app():
     from .routes.attendance import attendance_bp
     from .routes.important import important_bp
     from .routes.audit import audit_bp
+    from .routes.debug import debug_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(users_bp, url_prefix='/api/users')
@@ -57,6 +58,7 @@ def create_app():
     app.register_blueprint(attendance_bp, url_prefix='/api/attendance')
     app.register_blueprint(important_bp, url_prefix='/api/important')
     app.register_blueprint(audit_bp, url_prefix='/api/audit')
+    app.register_blueprint(debug_bp, url_prefix='/api/debug')
 
     with app.app_context():
         db.create_all()
