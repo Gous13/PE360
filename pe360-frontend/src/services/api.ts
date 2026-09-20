@@ -35,6 +35,7 @@ export const authApi = {
     api.post('/auth/login', { email, password }),
   changePassword: (oldPassword: string, newPassword: string) =>
     api.post('/auth/change-password', { oldPassword, newPassword }),
+  updateProfile: (data: any) => api.put('/auth/profile', data),
 };
 
 // Users (admin)
@@ -44,7 +45,6 @@ export const usersApi = {
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
   toggleStatus: (id: number) => api.patch(`/users/${id}/toggle-status`),
-  updateProfile: (data: any) => api.put('/users/profile', data),
   getSummary: () => api.get('/students/admin/summary'),
 };
 

@@ -75,3 +75,36 @@ def change_password():
     db.session.commit()
 
     return jsonify({'message': 'Password changed successfully'}), 200
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    """Update the currently authenticated user's own profile.
+    Uses JWT identity — never trusts a user_id from the request body.
+    """
+    from ..models import User
+    from .. import db
+
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'error': 'Name is required'}), 400
+
+    user.name = name
+
+    if 'schoolName' in data:
+        user.school_name = (data['schoolName'] or '').strip()
+    if 'phone' in data:
+        user.phone = (data['phone'] or '').strip()
+
+    db.session.commit()
+    return jsonify({'user': user.to_dict()}), 200

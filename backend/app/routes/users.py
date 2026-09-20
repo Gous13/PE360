@@ -166,25 +166,3 @@ def toggle_status(user_id):
     db.session.commit()
 
     return jsonify({'user': user.to_dict()}), 200
-
-
-# ── Profile update (any authenticated user can update their own school info) ──
-@users_bp.route('/profile', methods=['PUT'])
-@jwt_required()
-def update_profile():
-    user_id = get_jwt_identity()
-    user = User.query.get(int(user_id))
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-
-    data = request.get_json()
-
-    if 'schoolName' in data:
-        user.school_name = data['schoolName'].strip()
-    if 'phone' in data:
-        user.phone = data['phone'].strip()
-    if 'name' in data and data['name'].strip():
-        user.name = data['name'].strip()
-
-    db.session.commit()
-    return jsonify({'user': user.to_dict()}), 200

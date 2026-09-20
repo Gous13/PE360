@@ -3,7 +3,7 @@ import { UserCircle, Lock, LogOut, Shield, User, Building2, Phone, Edit2, Check,
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
-import { authApi, usersApi } from '../services/api';
+import { authApi } from '../services/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -66,7 +66,7 @@ export function Profile() {
     }
     setSaving(true);
     try {
-      const r = await usersApi.updateProfile({
+      const r = await authApi.updateProfile({
         name: profileForm.name,
         schoolName: profileForm.schoolName,
         phone: profileForm.phone,
