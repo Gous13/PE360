@@ -61,7 +61,7 @@ export function Students() {
         const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
         const errors: string[] = [];
         const students: Partial<Student>[] = [];
-        const rollNos = new Set<string>();
+        const studentKeys = new Set<string>();
 
         rows.forEach((row, i) => {
           const rowNum = i + 2;
@@ -73,8 +73,12 @@ export function Students() {
 
           if (!name) { errors.push(`Row ${rowNum}: Missing student name`); return; }
           if (!rollNo) { errors.push(`Row ${rowNum}: Missing roll number`); return; }
-          if (rollNos.has(rollNo)) { errors.push(`Row ${rowNum}: Duplicate roll number ${rollNo}`); return; }
-          rollNos.add(rollNo);
+          const studentKey = `${cls}|${section}|${rollNo}`;
+          if (studentKeys.has(studentKey)) {
+            errors.push(`Row ${rowNum}: Duplicate student — Class ${cls}-${section}, Roll No ${rollNo}`);
+            return;
+          }
+          studentKeys.add(studentKey);
 
           students.push({ rollNo, name, class: cls, section, gender: gender as any });
         });
