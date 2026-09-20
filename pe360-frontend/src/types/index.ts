@@ -73,6 +73,14 @@ export interface Sport {
   officials: string;
   court: CourtInfo;
   rules: SportRule[];
+  teamConfig: TeamConfig;
+}
+
+export interface TeamConfig {
+  teamSize: number;        // recommended / standard players per team
+  minTeamSize: number;     // minimum to form a valid team
+  maxTeamSize: number;     // max before team is considered oversized
+  format: 'team' | 'singles' | 'doubles' | 'relay'; // event format
 }
 
 export interface CourtInfo {

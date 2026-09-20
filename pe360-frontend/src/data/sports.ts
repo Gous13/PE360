@@ -41,6 +41,7 @@ export const sportsData: Sport[] = [
       { title: 'Jump Ball', description: 'Game starts with a jump ball at center circle. Used to restart after simultaneous possession.' },
       { title: 'Backcourt Violation', description: 'Once the offense advances the ball past half-court, they cannot return to the backcourt with possession.' },
     ],
+    teamConfig: { teamSize: 5, minTeamSize: 3, maxTeamSize: 7, format: 'team' },
   },
   {
     id: 2,
@@ -81,6 +82,7 @@ export const sportsData: Sport[] = [
       { title: 'Libero', description: 'Libero wears a different color jersey and can replace any back-row player. Cannot serve, spike, or rotate to front row.' },
       { title: 'Foot Faults', description: 'During serve, no part of the body may touch the court or end line. The ball must be tossed before being struck.' },
     ],
+    teamConfig: { teamSize: 6, minTeamSize: 4, maxTeamSize: 8, format: 'team' },
   },
   {
     id: 3,
@@ -120,6 +122,7 @@ export const sportsData: Sport[] = [
       { title: 'Wide Ball', description: 'Ball too wide for batsman to play. Extra run awarded and ball re-bowled.' },
       { title: 'Powerplay', description: 'In ODIs: first 10 overs only 2 fielders outside 30-yard circle. Batting team can call one 5-over powerplay.' },
     ],
+    teamConfig: { teamSize: 11, minTeamSize: 7, maxTeamSize: 13, format: 'team' },
   },
   {
     id: 4,
@@ -160,6 +163,7 @@ export const sportsData: Sport[] = [
       { title: 'Yellow & Red Cards', description: 'Yellow card = caution. Two yellows = red card (ejection). Direct red for serious offenses. Ejected player cannot be replaced.' },
       { title: 'Goalkeeper Rules', description: 'Goalkeeper can handle ball in penalty area but cannot hold it for more than 6 seconds. Cannot pick up a back-pass from teammate\'s foot.' },
     ],
+    teamConfig: { teamSize: 11, minTeamSize: 7, maxTeamSize: 13, format: 'team' },
   },
   {
     id: 5,
@@ -198,6 +202,7 @@ export const sportsData: Sport[] = [
       { title: 'Boundaries', description: 'Shuttlecock landing on line = in. Singles uses inner sidelines, doubles uses outer sidelines for long services.' },
       { title: 'Let', description: 'Rally replayed if shuttlecock gets stuck in net on service, if server serves before receiver is ready, or unexpected interference.' },
     ],
+    teamConfig: { teamSize: 2, minTeamSize: 1, maxTeamSize: 2, format: 'doubles' },
   },
   {
     id: 6,
@@ -236,6 +241,7 @@ export const sportsData: Sport[] = [
       { title: 'Let', description: 'If the ball clips the net on a service and lands in the correct box, the serve is replayed. No lets during rallies.' },
       { title: 'Foot Fault', description: 'Server\'s foot cannot touch or cross the baseline before striking the ball. Results in a fault.' },
     ],
+    teamConfig: { teamSize: 2, minTeamSize: 1, maxTeamSize: 2, format: 'doubles' },
   },
   {
     id: 7,
@@ -273,6 +279,7 @@ export const sportsData: Sport[] = [
       { title: 'Doubles Rule', description: 'In doubles, ball must be served from right half-court to opponent\'s right half-court. Players alternate hitting.' },
       { title: 'Expedite System', description: 'After 10 minutes, if game is not over, server must win point in 13 strokes or receiver wins the point.' },
     ],
+    teamConfig: { teamSize: 2, minTeamSize: 1, maxTeamSize: 2, format: 'doubles' },
   },
   {
     id: 8,
@@ -311,6 +318,7 @@ export const sportsData: Sport[] = [
       { title: 'Penalty Stroke', description: 'Awarded for a deliberate foul preventing a certain goal. One-on-one with goalkeeper from penalty spot.' },
       { title: 'Duration', description: 'Four quarters of 15 minutes each. 2-minute break between quarters 1-2 and 3-4; 5-minute halftime break.' },
     ],
+    teamConfig: { teamSize: 11, minTeamSize: 7, maxTeamSize: 13, format: 'team' },
   },
   {
     id: 9,
@@ -348,6 +356,7 @@ export const sportsData: Sport[] = [
       { title: 'Revival', description: 'Players who are out are revived one at a time each time their team scores a point. Player returns in the order they went out.' },
       { title: 'All Out', description: 'If all 7 players of a team are out, the opposing team scores 2 extra bonus points.' },
     ],
+    teamConfig: { teamSize: 7, minTeamSize: 5, maxTeamSize: 9, format: 'team' },
   },
   {
     id: 10,
@@ -386,6 +395,7 @@ export const sportsData: Sport[] = [
       { title: 'Scoring', description: 'Each time a runner is tagged, the chasing team earns a point. A complete turn consists of tagging all runners in the batch.' },
       { title: 'Duration', description: 'Match consists of 4 innings (2 per team), each 7 minutes with 5-minute breaks.' },
     ],
+    teamConfig: { teamSize: 9, minTeamSize: 6, maxTeamSize: 12, format: 'team' },
   },
   {
     id: 11,
@@ -424,6 +434,7 @@ export const sportsData: Sport[] = [
       { title: 'Fouls', description: 'Progressive punishments: free throw → 2-minute suspension → red card (match disqualification).' },
       { title: 'Duration', description: 'Two halves of 30 minutes. Extra time: 2 × 5 minutes. Penalty shootout if still tied.' },
     ],
+    teamConfig: { teamSize: 7, minTeamSize: 5, maxTeamSize: 9, format: 'team' },
   },
   {
     id: 12,
@@ -460,6 +471,7 @@ export const sportsData: Sport[] = [
       { title: 'Net Violations', description: 'Ball must clear the net. Touching the net during play is a fault. Ball touching the net during service is replayed.' },
       { title: 'Rotation', description: 'Teams rotate after winning serve from opponent. All 9 positions rotate clockwise.' },
     ],
+    teamConfig: { teamSize: 9, minTeamSize: 6, maxTeamSize: 11, format: 'team' },
   },
   {
     id: 13,
@@ -498,6 +510,7 @@ export const sportsData: Sport[] = [
       { title: 'Field Events - Throwing', description: 'Athlete must stay within throwing circle. Three attempts in qualifying, then top 8 get three more. Best throw counts.' },
       { title: 'Photo Finish', description: 'Photo finish cameras determine placements when finishing is very close. Times measured to 0.001 seconds in major competitions.' },
     ],
+    teamConfig: { teamSize: 4, minTeamSize: 1, maxTeamSize: 8, format: 'relay' },
   },
 ];
 
